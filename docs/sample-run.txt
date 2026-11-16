@@ -1,0 +1,40 @@
+lab up (WireGuard: wireguard-go)
+waiting for the tunnel...
+== 1. Baseline: all three ISPs up
+  PASS  laptop exits via = 203.0.113.2
+  PASS  US device exits via = 198.18.9.2
+  PASS  relay sees home at = 203.0.113.2
+  PASS  US device DNS answered by = US
+  PASS  laptop DNS answered by = LOCAL
+== 2. ISP1 fails (line stays up, traffic dies upstream)
+  PASS  US path recovered in 5s
+  PASS  laptop exits via = 192.0.2.2
+  PASS  US device exits via = 198.18.9.2
+  PASS  relay sees home at = 192.0.2.2
+  PASS  US device DNS answered by = US
+  PASS  alert: ISP1 down, switched to ISP2
+== 3. ISP2 fails too: only ISP3 (CGNAT, no static IP) left
+  PASS  US path recovered over ISP3 in 6s
+  PASS  laptop exits via (ISP3 CGNAT address) = 198.18.3.2
+  PASS  relay sees home at (ISP3 CGNAT address) = 198.18.3.2
+  PASS  alert: ISP2 down, switched to ISP3
+== 4. ISP1 comes back: traffic returns to the primary
+  PASS  back on ISP1 in 2s
+  PASS  US path fine after failback (0s)
+  PASS  alert: ISP1 back up
+== 5. Kill switch: relay unreachable must not leak US traffic to a local ISP
+  PASS  US device blocked while the tunnel is down
+  PASS  laptop unaffected = 203.0.113.2
+  PASS  blackhole route holds with the tunnel route gone
+  PASS  US device DNS blocked too (no local fallback)
+  PASS  tunnel back, US path restored in 0s
+== 6. Control: without the US routing rule, traffic WOULD leak (proves test 5 is real)
+  PASS  with protection removed, US device leaks via ISP1 (203.0.113.2): the rule is what stops it
+  PASS  protection restored, US device exits via = 198.18.9.2
+
+alerts sent during the run:
+  17:32:36 ALERT ISP1 down, switched to ISP2
+  17:32:42 ALERT ISP2 down, switched to ISP3
+  17:32:45 ALERT ISP1 back up, switched from ISP3 to ISP1
+
+WireGuard: wireguard-go   passed: 25   failed: 0

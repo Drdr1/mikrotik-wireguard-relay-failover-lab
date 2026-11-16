@@ -1,0 +1,38 @@
+name: ci
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  simulation:
+    name: end-to-end failover simulation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq wireguard-tools nftables conntrack dnsutils dnsmasq-base curl iproute2
+      - run: sudo sim/test.sh
+
+  routeros-import:
+    name: import on real RouterOS CHR ${{ matrix.version }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ["7.16.2", "stable"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm || true
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq qemu-system-x86 sshpass unzip
+      - run: tools/chr-import-check.sh ${{ matrix.version }}
+
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: shellcheck -S warning sim/*.sh tools/*.sh relay/setup.sh exit/setup.sh
